@@ -10,7 +10,8 @@ a_pi = 0.5
 taylor <- data.frame(date=deflator$observation_date)
 taylor$gap <- gdp_real$GDPC1-gdp_pot$GDPPOT
 taylor$optimal <- ( deflator$deflator + HLW_natural_r$r + a_pi*(deflator$deflator-2) + a_y*100*(taylor$gap)/gdp_pot$GDPPOT)
-taylor$nogap <- ( deflator$deflator + HLW_natural_r$r + (deflator$deflator-2) ) # optimal assuming a_y=0
+taylor$nogap <- ( deflator$deflator + HLW_natural_r$r + a_pi*(deflator$deflator-2) ) # optimal assuming a_y=0
+
 # get quarterly fundsrates (yes this is a dumb way of doing it)
 fundsrate_qtr <-   fundsrate[ grepl("01-01$", as.character(fundsrate$observation_date)) |
                               grepl("04-01$", as.character(fundsrate$observation_date)) |
@@ -41,4 +42,24 @@ chownogap <- lm(taylor$actual ~ deflator$deflator + HLW_natural_r$r)
 coeftest(chowgap, vcov=NeweyWest(chowgap))
 coeftest(chownogap, vcov=NeweyWest(chownogap))
 # Chow test (from 1985): F=32.5584642234, 159 DF, q=1
-#           (from 2010): very fucking significant
+#           (from 2010): very significant
+
+# now using real-time data
+
+# get real-time inflation 
+rt_taylor <- data.frame(date=deflator$observation_date)
+rt_taylor$deflator <- rt_ngdp$d - rt_rgdp$d
+rt_taylor$gap <- gdp_real$GDPC1-gdp_pot$GDPPOT #TODO replace with realtime gap
+rt_taylor$actual <- taylor$actual
+# TODO realtime natural rate of interest
+
+rt_taylor$optimal <- ( rt_taylor$deflator + HLW_natural_r$r + a_pi*(rt_taylor$deflator-2) + a_y*100*(rt_taylor$gap)/gdp_pot$GDPPOT)
+rt_taylor$nogap <- ( rt_taylor$deflator + HLW_natural_r$r + a_pi*(rt_taylor$deflator-2) ) # optimal assuming a_y=0
+ggplot(rt_taylor, aes(date)) +
+  geom_line(aes(y=optimal, colour="Taylor at alpha_y=0.5")) +
+  geom_line(aes(y=actual, colour="actual interest rate")) +
+  geom_line(aes(y=nogap, colour="Taylor at alpha_y=0")) +
+  theme_linedraw()
+
+
+
