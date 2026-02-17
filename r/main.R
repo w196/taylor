@@ -2,6 +2,7 @@ library(dplyr)
 library(ggplot2)
 library(sandwich)
 library(lmtest)
+library(lubridate)
 
 # compute classical taylor rule for our period in question
 a_y = 0.5
@@ -44,22 +45,56 @@ coeftest(chownogap, vcov=NeweyWest(chownogap))
 # Chow test (from 1985): F=32.5584642234, 159 DF, q=1
 #           (from 2010): very significant
 
-# now using real-time data
+############################
+# now using real-time data #
+############################
 
 # get real-time inflation 
 rt_taylor <- data.frame(date=deflator$observation_date)
 rt_taylor$deflator <- rt_ngdp$d - rt_rgdp$d
 rt_taylor$gap <- gdp_real$GDPC1-gdp_pot$GDPPOT #TODO replace with realtime gap
-rt_taylor$actual <- taylor$actual
 # TODO realtime natural rate of interest
+
+rt_taylor$actual <- taylor$actual
 
 rt_taylor$optimal <- ( rt_taylor$deflator + HLW_natural_r$r + a_pi*(rt_taylor$deflator-2) + a_y*100*(rt_taylor$gap)/gdp_pot$GDPPOT)
 rt_taylor$nogap <- ( rt_taylor$deflator + HLW_natural_r$r + a_pi*(rt_taylor$deflator-2) ) # optimal assuming a_y=0
+
 ggplot(rt_taylor, aes(date)) +
   geom_line(aes(y=optimal, colour="Taylor at alpha_y=0.5")) +
   geom_line(aes(y=actual, colour="actual interest rate")) +
   geom_line(aes(y=nogap, colour="Taylor at alpha_y=0")) +
   theme_linedraw()
 
+# annoying format so we'll do this the awful and slow way
+# every vintage is in its own sheet so we just iterate through every sheet and take the last observation
+size=74
+rt_rstar <- data_frame(
+  date=as.Date(matrix(nrow=size))
+)
 
+# format completely fucking changes at [62], thank you America
+for (i in 1:62) {
+  buf <- read_excel(path="data/rt_rstar.xlsx", sheet=i)
+  rt_rstar$date[i] <- as.Date(
+    as.integer(tail(buf[1], n=1)),
+    origin="1899-12-30"
+  )
+  rt_rstar$gap[i] <- as.numeric(tail(buf$...12, n=1))
+  rt_rstar$rstar[i] <- as.numeric(tail(buf$...15, n=1))
+}
 
+for (i in 63:size) {
+  buf <- read_excel(path="data/rt_rstar.xlsx", sheet=i)
+  rt_rstar$date[i] <- as.Date(
+    as.integer(tail(buf[1], n=1)),
+    origin="1899-12-30"
+  )
+  rt_rstar$gap[i] <- as.numeric(tail(buf$...11, n=1))
+  rt_rstar$rstar[i] <- as.numeric(tail(buf$...8, n=1))
+}
+
+# shift rt_rstar by 1 day ahead, then 1 quarter behind to line up with other data
+rt_rstar$date <- rt_rstar$date + days(1)
+rt_rstar$date <- lag(rt_rstar$date)
+rt_rstar$date[1] <- as.Date("2005-01-01")
